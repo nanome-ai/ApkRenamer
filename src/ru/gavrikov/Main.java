@@ -36,6 +36,7 @@ public class Main {
         String out = parser.extractArgument("-o");
         String name = parser.extractArgument("-n");
         String pack = parser.extractArgument("-p");
+        String oldPack = parser.extractArgument("-po");
         String icon = parser.extractArgument("-i");
         String dictionary = parser.extractArgument("-r");
         String decodeArguments = parser.extractArgument("-da");
@@ -51,7 +52,7 @@ public class Main {
         System.out.println(icon);
 
 
-        Renamer mRenamer = new Renamer(in, out, name, pack, icon, isDeepRename, isPauseActive, isSkipModify, decodeArguments, buildArguments, dictionary);
+        Renamer mRenamer = new Renamer(in, out, name, pack, oldPack, icon, isDeepRename, isPauseActive, isSkipModify, decodeArguments, buildArguments, dictionary);
 //        if (args.length > 1) {
 //            mRenamer = new Renamer(in, out, name, pack, icon, isDeepRename, isPauseActive, isSkipModify);
 //        } else {
@@ -65,7 +66,7 @@ public class Main {
 
     private static void showHelp() {
         String helpText = "\n" + "Use the renamer program to change an app name, a package name and an icon in an Android app.\n"
-                + "\n" + "Usage: java -jar renamer.jar [-a path/to/app.apk] [-o path/to/renamed_app.apk] [-n new_name] [-p new.package.name] [-i new_icon.png] \n"
+                + "\n" + "Usage: java -jar renamer.jar [-a path/to/app.apk] [-o path/to/renamed_app.apk] [-n new_name] [-p new.package.name] [-po old.package.name] [-i new_icon.png] \n"
                 + "\n" + "You can place app.apk to \"in\" folder, new_icon.png to \"icon\" folder \n"
                 + "and run java -jar renamer.jar without arguments. Your renamed_app.apk will be placed in \"out\" folder"
                 + "\n\nAdd the [-d] flag to perform a \"deep renaming\"."
@@ -122,6 +123,7 @@ class Renamer {
 
     private String appName = "";
     private String pacName = "out";
+    private String oldPacName = "";
     private String iconName = "";
 
     private Boolean isDeepRenaming = false;
@@ -148,6 +150,7 @@ class Renamer {
                    String out,
                    String name,
                    String pack,
+                   String oldPack,
                    String icon,
                    Boolean isDeepRenaming,
                    Boolean isPauseActive,
@@ -171,6 +174,9 @@ class Renamer {
                 this.pacName = pack;
             } else {
                 this.pacName = inputNewPackageName();
+            }
+            if (!oldPack.equals("")) {
+                this.oldPacName = oldPack;
             }
         }
         if (!icon.equals("")) {
@@ -617,6 +623,32 @@ class Renamer {
         replaceAttribute(n, new String[]{}, "package", packageName);
     }
 
+    private void changePackageName(Node n, String newPackageName, String oldPackageName) {
+        replaceAttributeValue(n, newPackageName, oldPackageName);
+    }
+
+    private void replaceAttributeValue(Node n, String newStr, String oldStr) {
+        if (n.hasAttributes()) {
+            NamedNodeMap attributes = n.getAttributes();
+            int numAttrs = attributes.getLength();
+            for (int i = 0; i < numAttrs; i++) {
+                Attr attr = (Attr) attributes.item(i);
+                String attrValue = attr.getNodeValue();
+
+                if (attrValue.contains(oldStr)) {
+                    attr.setValue(attrValue.replace(oldStr, newStr));
+                }
+            }
+        }
+
+        NodeList childNodes = n.getChildNodes();
+        int numChildren = childNodes.getLength();
+        for (int i = 0; i < numChildren; i++) {
+            Node child = childNodes.item(i);
+            replaceAttributeValue(child, newStr, oldStr);
+        }
+    }
+
     private Node getMainXmlNode(File f) {
         Node root = null;
         //File f = new File(getManifestFile());
@@ -691,7 +723,9 @@ class Renamer {
         String packageName = getPackageName(manifest);
 
 
-        if (!this.pacName.equals("")) {
+        if (!this.oldPacName.equals("") && !this.pacName.equals("")) {
+            changePackageName(manifest, this.pacName, this.oldPacName);
+        } else if (!this.pacName.equals("")) {
             changePackageName(manifest, this.pacName);
         }
 
